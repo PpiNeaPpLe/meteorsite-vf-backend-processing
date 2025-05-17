@@ -131,6 +131,26 @@ app.get('/api/transcript-url', async (req, res) => {
     const matchingTranscript = transcripts.find(transcript => transcript.sessionID === sessionId);
 
     if (!matchingTranscript) {
+      // Return user-friendly HTML if no transcript is found and html=true
+      if (html === 'true') {
+        const notFoundHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; text-align: center;">
+          <h2 style="margin-bottom: 20px; color: #444;">Conversation Not Found</h2>
+          <p style="font-size: 16px; color: #666; margin-bottom: 30px;">
+            We couldn't find a conversation with the provided session ID. The conversation may have been deleted or the session ID might be incorrect.
+          </p>
+          <p style="font-size: 14px; color: #888;">
+            Session ID: ${sessionId}<br>
+            Project ID: ${projectId}
+          </p>
+        </div>
+        `;
+        
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(notFoundHtml);
+      }
+      
+      // Otherwise return JSON error
       return res.status(404).json({ 
         error: 'No transcript found with the provided session ID',
         availableSessions: transcripts.map(t => t.sessionID)
@@ -166,13 +186,24 @@ app.get('/api/transcript-url', async (req, res) => {
         const messages = [];
         
         transcriptDetails.forEach(item => {
-          if (item.type === 'text') {
+          // Extract assistant messages (text type)
+          if (item.type === 'text' && item.payload?.payload?.message) {
             messages.push({
               type: 'assistant',
               text: item.payload.payload.message,
               time: new Date(item.startTime).toLocaleString()
             });
-          } else if (item.type === 'user-input' && item.payload && item.payload.payload && item.payload.payload.message) {
+          } 
+          // Extract user input messages (request type with intent payload)
+          else if (item.type === 'request' && item.payload?.type === 'intent' && item.payload?.payload?.query) {
+            messages.push({
+              type: 'user',
+              text: item.payload.payload.query,
+              time: new Date(item.startTime).toLocaleString()
+            });
+          }
+          // Extract user input messages (user-input type)
+          else if (item.type === 'user-input' && item.payload?.payload?.message) {
             messages.push({
               type: 'user',
               text: item.payload.payload.message,
@@ -180,6 +211,9 @@ app.get('/api/transcript-url', async (req, res) => {
             });
           }
         });
+        
+        // Sort messages by time
+        messages.sort((a, b) => new Date(a.time) - new Date(b.time));
         
         // Generate HTML
         let htmlContent = `
