@@ -101,7 +101,7 @@ app.post('/api/knowledge-query', async (req, res) => {
 // Endpoint to get transcript URL by session ID
 app.get('/api/transcript-url', async (req, res) => {
   try {
-    const { apiKey, projectId, sessionId, string } = req.query;
+    const { apiKey, projectId, sessionId, string, html } = req.query;
     
     if (!apiKey) {
       return res.status(400).json({ error: 'API key is required' });
@@ -146,6 +146,116 @@ app.get('/api/transcript-url', async (req, res) => {
     // Format the URL for the transcript
     const transcriptUrl = `https://creator.voiceflow.com/project/${urlProjectId}/transcripts/${matchingTranscript._id}`;
 
+    // If HTML format is requested, fetch transcript details and format as HTML
+    if (html === 'true') {
+      try {
+        // Fetch the transcript details
+        const transcriptDetailsResponse = await axios.get(
+          `https://api.voiceflow.com/v2/transcripts/${projectId}/${matchingTranscript._id}`,
+          {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': apiKey
+            }
+          }
+        );
+        
+        const transcriptDetails = transcriptDetailsResponse.data;
+        
+        // Extract user messages and assistant responses
+        const messages = [];
+        
+        transcriptDetails.forEach(item => {
+          if (item.type === 'text') {
+            messages.push({
+              type: 'assistant',
+              text: item.payload.payload.message,
+              time: new Date(item.startTime).toLocaleString()
+            });
+          } else if (item.type === 'user-input' && item.payload && item.payload.payload && item.payload.payload.message) {
+            messages.push({
+              type: 'user',
+              text: item.payload.payload.message,
+              time: new Date(item.startTime).toLocaleString()
+            });
+          }
+        });
+        
+        // Generate HTML
+        let htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+          <h2 style="text-align: center; margin-bottom: 20px;">Conversation Transcript</h2>
+          <div style="margin-bottom: 30px;">
+        `;
+        
+        // Add messages to HTML
+        messages.forEach(message => {
+          const alignment = message.type === 'user' ? 'right' : 'left';
+          const bgColor = message.type === 'user' ? '#E1F5FE' : '#F5F5F5';
+          const textAlign = message.type === 'user' ? 'right' : 'left';
+          
+          htmlContent += `
+            <div style="margin-bottom: 15px; text-align: ${alignment};">
+              <div style="display: inline-block; max-width: 70%; background: ${bgColor}; padding: 10px 15px; border-radius: 10px; text-align: ${textAlign};">
+                <p style="margin: 0; font-size: 16px;">${message.text}</p>
+                <p style="margin: 5px 0 0 0; font-size: 12px; color: #888;">${message.time}</p>
+              </div>
+            </div>
+          `;
+        });
+        
+        // Add View Transcript button
+        htmlContent += `
+          </div>
+          <div style="font-family: Arial, sans-serif; text-align: center; margin: 2em;">
+            <p style="font-size: 1.1em;">You can view the full conversation here:</p>
+            <a href="${transcriptUrl}" target="_blank" style="
+              display: inline-block;
+              padding: 0.75em 1.5em;
+              font-size: 1em;
+              color: #fff;
+              background-color: #007BFF;
+              border: none;
+              border-radius: 0.3em;
+              text-decoration: none;
+              transition: background-color 0.3s ease;
+            " onmouseover="this.style.backgroundColor='#0056b3'" onmouseout="this.style.backgroundColor='#007BFF'">
+              View Transcript
+            </a>
+          </div>
+        </div>
+        `;
+        
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(htmlContent);
+      } catch (error) {
+        console.error('Error fetching transcript details:', error.message);
+        
+        // If we fail to get the details, still return basic HTML with the URL
+        const basicHtml = `
+        <div style="font-family: Arial, sans-serif; text-align: center; margin: 2em;">
+          <p style="font-size: 1.1em;">You can view the conversation here:</p>
+          <a href="${transcriptUrl}" target="_blank" style="
+            display: inline-block;
+            padding: 0.75em 1.5em;
+            font-size: 1em;
+            color: #fff;
+            background-color: #007BFF;
+            border: none;
+            border-radius: 0.3em;
+            text-decoration: none;
+            transition: background-color 0.3s ease;
+          " onmouseover="this.style.backgroundColor='#0056b3'" onmouseout="this.style.backgroundColor='#007BFF'">
+            View Transcript
+          </a>
+        </div>
+        `;
+        
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(basicHtml);
+      }
+    }
+    
     // Check if string parameter is true, return plain text URL
     if (string === 'true') {
       res.setHeader('Content-Type', 'text/plain');
