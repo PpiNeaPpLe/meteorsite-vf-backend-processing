@@ -101,7 +101,7 @@ app.post('/api/knowledge-query', async (req, res) => {
 // Endpoint to get transcript URL by session ID
 app.get('/api/transcript-url', async (req, res) => {
   try {
-    const { apiKey, projectId, sessionId } = req.query;
+    const { apiKey, projectId, sessionId, string } = req.query;
     
     if (!apiKey) {
       return res.status(400).json({ error: 'API key is required' });
@@ -145,6 +145,12 @@ app.get('/api/transcript-url', async (req, res) => {
 
     // Format the URL for the transcript
     const transcriptUrl = `https://creator.voiceflow.com/project/${urlProjectId}/transcripts/${matchingTranscript._id}`;
+
+    // Check if string parameter is true, return plain text URL
+    if (string === 'true') {
+      res.setHeader('Content-Type', 'text/plain');
+      return res.send(transcriptUrl);
+    }
 
     res.json({
       transcriptUrl,
