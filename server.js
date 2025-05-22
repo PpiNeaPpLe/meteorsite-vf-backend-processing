@@ -112,7 +112,27 @@ app.get('/api/transcript-url', async (req, res) => {
     }
     
     if (!sessionId) {
-      return res.status(400).json({ error: 'Session ID is required' });
+      // Return 200 with error message when session ID is missing
+      if (html === 'true') {
+        const noSessionHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; text-align: center;">
+          <h2 style="margin-bottom: 20px; color: #444;">Missing Session ID</h2>
+          <p style="font-size: 16px; color: #666; margin-bottom: 30px;">
+            No session ID was provided. Please include a valid session ID to view the transcript.
+          </p>
+        </div>
+        `;
+        
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(noSessionHtml);
+      }
+      
+      // Return JSON with error message but status 200
+      return res.status(200).json({ 
+        success: false,
+        error: 'No session ID was provided',
+        message: 'Please provide a valid session ID to view the transcript'
+      });
     }
 
     // Make a request to Voiceflow Transcripts API
