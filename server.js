@@ -68,11 +68,22 @@ app.post('/api/knowledge-query', async (req, res) => {
     // Process the response similar to the main function provided
     const chunks = voiceflowResponse.data.chunks || [];
     
-    // Extract titles from URLs
-    const results = [];
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
+    // Extract unique URLs first to avoid duplicates
+    const uniqueUrls = new Set();
+    const uniqueSources = [];
+    
+    chunks.forEach(chunk => {
       const url = chunk?.source?.url || "";
+      if (url && !uniqueUrls.has(url)) {
+        uniqueUrls.add(url);
+        uniqueSources.push({ url, source: chunk.source });
+      }
+    });
+    
+    // Extract titles from unique URLs
+    const results = [];
+    for (let i = 0; i < uniqueSources.length; i++) {
+      const { url } = uniqueSources[i];
       
       // Use URL to fetch the page title
       const title = await extractTitleFromUrl(url);
