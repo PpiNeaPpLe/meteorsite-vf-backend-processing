@@ -54,7 +54,7 @@ app.post('/api/knowledge-query', async (req, res) => {
           model: "gpt-4o-mini",
           temperature: 0.2
         },
-        chunkLimit: 2
+        chunkLimit: 20
       },
       {
         headers: {
